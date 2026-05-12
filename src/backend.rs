@@ -11,9 +11,9 @@ pub struct Backend {
 }
 
 impl Backend {
-    pub fn new(address: &str) -> Self {
+    pub fn new(address: String) -> Self {
         Self {
-            address: address.to_string(),
+            address,
             is_healthy: AtomicBool::new(true), // Assume healthy initially until proven otherwise
             active_connections: AtomicUsize::new(0),
         }

@@ -13,7 +13,7 @@ pub struct LoadBalancer {
 }
 
 impl LoadBalancer {
-    pub fn new(backends_addresses: Vec<&str>, algorithm: Algorithm) -> Self {
+    pub fn new(backends_addresses: Vec<String>, algorithm: Algorithm) -> Self {
         let backends = backends_addresses
             .into_iter()
             .map(Backend::new)

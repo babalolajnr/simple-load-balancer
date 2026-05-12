@@ -48,32 +48,31 @@ cargo build --release
 ### Start the Load Balancer
 
 ```bash
-cargo run --release
+cargo run --release -- [OPTIONS]
+```
+
+Example with custom settings:
+```bash
+cargo run --release -- --listen 127.0.0.1:8080 --backends 127.0.0.1:8081,127.0.0.1:8082 --algorithm round-robin
 ```
 
 Expected output:
 ```
 Load balancer started on 127.0.0.1:8080
-Algorithm: least-connections | Active health checks: Enabled
+Algorithm: "round-robin" | Active health checks: Enabled
 ```
 
 ### Running with Test Servers
 
-Before starting the load balancer, you need backend servers listening on ports 8081, 8082, and 8083. You can use simple TCP echo servers or any service listening on those ports.
+Before starting the load balancer, you need backend servers listening on the specified ports.
 
-Example with `nc` (netcat):
+Example using the provided `test_backends.py` (requires Python 3):
 ```bash
-# Terminal 1: Start backend 1
-nc -l 127.0.0.1 8081
+# Terminal 1: Start backend servers (8081, 8082, 8083)
+python3 test_backends.py
 
-# Terminal 2: Start backend 2
-nc -l 127.0.0.1 8082
-
-# Terminal 3: Start backend 3
-nc -l 127.0.0.1 8083
-
-# Terminal 4: Start the load balancer
-cargo run --release
+# Terminal 2: Start the load balancer
+cargo run --release -- --backends 127.0.0.1:8081,127.0.0.1:8082,127.0.0.1:8083
 ```
 
 ### Testing with Python Client
@@ -90,36 +89,21 @@ This script:
 - Holds connections open for 2 seconds to test connection tracking
 - Perfect for testing the "least connections" algorithm
 
-#### Test Script Configuration
-
-In `test_lb.py`, you can adjust:
-- `NUM_CLIENTS`: Number of concurrent clients (default: 10)
-- `CONNECTION_DELAY`: Delay between starting clients (default: 0.5s)
-- `WORK_DURATION`: How long each client stays connected (default: 2s)
-
 ## Configuration
 
-Currently, configuration is hardcoded in `src/main.rs`. To customize:
+The load balancer is configured via command-line arguments:
 
-### Change Listen Address
-```rust
-let listen_addr = "127.0.0.1:8080";  // Modify this line
-```
+| Argument | Short | Default | Description |
+|----------|-------|---------|-------------|
+| `--listen` | `-l` | `127.0.0.1:8080` | Address to listen on |
+| `--backends` | `-b` | `127.0.0.1:8081,127.0.0.1:8082,127.0.0.1:8083` | Comma-separated list of backend addresses |
+| `--algorithm` | `-a` | `least-connections` | Load balancing algorithm (`round-robin`, `least-connections`, `random`) |
+| `--health-interval` | | `5` | Health check interval in seconds |
+| `--health-timeout` | | `1` | Health check timeout in seconds |
 
-### Change Algorithm
-```rust
-let algorithm = Algorithm::LeastConnections;  // Change to RoundRobin or Random
-```
-
-### Change Backend Servers
-```rust
-vec!["127.0.0:8081", "127.0.0:8082", "127.0.0:8083"]  // Modify addresses
-```
-
-### Adjust Health Check Interval
-In `src/health.rs`, modify:
-```rust
-let mut interval = time::interval(Duration::from_secs(5));  // Change interval
+Example:
+```bash
+cargo run -- --backends 127.0.0.1:8081,127.0.0.1:8082 --health-interval 2
 ```
 
 ## Dependencies
@@ -182,7 +166,7 @@ Backend 127.0.0.1:8082 is now unhealthy! Marking as UNHEALTHY.
 ## Future Enhancements
 
 - [ ] Configuration file support (TOML/YAML)
-- [ ] CLI arguments for dynamic configuration
+- [x] CLI arguments for dynamic configuration
 - [ ] Metrics and monitoring endpoints
 - [ ] Connection pooling
 - [ ] Weighted round-robin

@@ -1,5 +1,7 @@
+use clap::ValueEnum;
+
 /// Defines the available load balancing strategies.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum Algorithm {
     RoundRobin,
     LeastConnections,
