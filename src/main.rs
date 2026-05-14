@@ -50,14 +50,29 @@ async fn main() -> io::Result<()> {
         TomlConfig::default()
     };
 
-    let listen = args
-        .listen
-        .or(config_file.listen)
+    let Args {
+        config: _,
+        listen: args_listen,
+        backends: args_backends,
+        algorithm: args_algorithm,
+        health_interval: args_health_interval,
+        health_timeout: args_health_timeout,
+    } = args;
+
+    let TomlConfig {
+        listen: cfg_listen,
+        backends: cfg_backends,
+        algorithm: cfg_algorithm,
+        health_interval: cfg_health_interval,
+        health_timeout: cfg_health_timeout,
+    } = config_file;
+
+    let listen = args_listen
+        .or(cfg_listen)
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
 
-    let backends = args
-        .backends
-        .or(config_file.backends)
+    let backends = args_backends
+        .or(cfg_backends)
         .unwrap_or_else(|| {
             vec![
                 "127.0.0.1:8081".to_string(),
@@ -66,13 +81,12 @@ async fn main() -> io::Result<()> {
             ]
         });
 
-    let algorithm = args
-        .algorithm
-        .or(config_file.algorithm)
+    let algorithm = args_algorithm
+        .or(cfg_algorithm)
         .unwrap_or(Algorithm::LeastConnections);
 
-    let health_interval = args.health_interval.or(config_file.health_interval).unwrap_or(5);
-    let health_timeout = args.health_timeout.or(config_file.health_timeout).unwrap_or(1);
+    let health_interval = args_health_interval.or(cfg_health_interval).unwrap_or(5);
+    let health_timeout = args_health_timeout.or(cfg_health_timeout).unwrap_or(1);
 
     let lb = Arc::new(LoadBalancer::new(backends, algorithm));
 
