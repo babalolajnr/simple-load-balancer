@@ -74,7 +74,7 @@ async fn main() -> io::Result<()> {
     let health_interval = args.health_interval.or(config_file.health_interval).unwrap_or(5);
     let health_timeout = args.health_timeout.or(config_file.health_timeout).unwrap_or(1);
 
-    let lb = Arc::new(LoadBalancer::new(backends.clone(), algorithm));
+    let lb = Arc::new(LoadBalancer::new(backends, algorithm));
 
     let lb_clone = Arc::clone(&lb);
     tokio::spawn(async move {
