@@ -1,18 +1,19 @@
-use crate::{algorithm::Algorithm, backend::Backend};
+use crate::algorithm::Algorithm;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
-struct TomlConfig {
-    listen: String,
-    backends: Vec<Backend>,
-    algorithm: Algorithm,
-    health_interval: u64,
-    health_timeout: u64,
+#[derive(Debug, Deserialize, Default)]
+pub struct TomlConfig {
+    pub listen: Option<String>,
+    pub backends: Option<Vec<String>>,
+    pub algorithm: Option<Algorithm>,
+    pub health_interval: Option<u64>,
+    pub health_timeout: Option<u64>,
 }
 
 impl TomlConfig {
-    pub fn new(path: &str) -> Self {
-        let content = std::fs::read_to_string(path).unwrap();
-        toml::from_str(&content).unwrap()
+    pub fn new(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let content = std::fs::read_to_string(path)?;
+        let config = toml::from_str(&content)?;
+        Ok(config)
     }
 }

@@ -46,7 +46,7 @@ impl LoadBalancer {
                 Some(chosen_index)
             }
             Algorithm::Random => {
-                let rng = rand::random::<f64>() as usize % healthy_indices.len();
+                let rng = rand::random_range(0..healthy_indices.len());
                 Some(healthy_indices[rng])
             }
             Algorithm::LeastConnections => {
@@ -64,6 +64,28 @@ impl LoadBalancer {
 mod tests {
     use super::*;
     use std::sync::atomic::Ordering;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_random_algorithm_is_actually_random() {
+        let backends = vec![
+            "127.0.0.1:8081".to_string(),
+            "127.0.0.1:8082".to_string(),
+            "127.0.0.1:8083".to_string(),
+        ];
+        let balancer = LoadBalancer::new(backends, Algorithm::Random);
+
+        let mut selected_indices = HashSet::new();
+        // With 3 backends, after 100 iterations, we should have seen more than one.
+        // Statistically, the chance of picking the same one 100 times is (1/3)^99 which is negligible.
+        for _ in 0..100 {
+            if let Some(index) = balancer.select_backend() {
+                selected_indices.insert(index);
+            }
+        }
+
+        assert!(selected_indices.len() > 1, "Random algorithm should select more than one backend, but got only {:?}", selected_indices);
+    }
 
     #[test]
     fn test_new_load_balancer_initialization() {
