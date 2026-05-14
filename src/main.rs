@@ -1,7 +1,7 @@
 use clap::Parser;
 use load_balancer::{
     algorithm::Algorithm, backend::ConnectionGuard, balancer::LoadBalancer,
-    health::run_health_checks,
+    health::run_health_checks, config::toml::TomlConfig,
 };
 use std::sync::{Arc, atomic::Ordering};
 use tokio::{
@@ -12,36 +12,71 @@ use tokio::{
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    /// Configuration file path (TOML)
+    #[arg(short, long)]
+    config: Option<String>,
+
     /// Address to listen on
-    #[arg(short, long, default_value = "127.0.0.1:8080")]
-    listen: String,
+    #[arg(short, long)]
+    listen: Option<String>,
 
     /// Backend servers to route traffic to
-    #[arg(short, long, default_value = "127.0.0.1:8081,127.0.0.1:8082,127.0.0.1:8083", value_delimiter = ',')]
-    backends: Vec<String>,
+    #[arg(short, long, value_delimiter = ',')]
+    backends: Option<Vec<String>>,
 
     /// Load balancing algorithm to use
-    #[arg(short, long, default_value = "least-connections")]
-    algorithm: Algorithm,
+    #[arg(short, long)]
+    algorithm: Option<Algorithm>,
 
     /// Health check interval in seconds
-    #[arg(long, default_value_t = 5)]
-    health_interval: u64,
+    #[arg(long)]
+    health_interval: Option<u64>,
 
     /// Health check timeout in seconds
-    #[arg(long, default_value_t = 1)]
-    health_timeout: u64,
+    #[arg(long)]
+    health_timeout: Option<u64>,
 }
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let args = Args::parse();
 
-    let lb = Arc::new(LoadBalancer::new(args.backends.clone(), args.algorithm));
+    let config_file = if let Some(path) = &args.config {
+        TomlConfig::new(path).unwrap_or_else(|e| {
+            eprintln!("Failed to load config file: {}", e);
+            std::process::exit(1);
+        })
+    } else {
+        TomlConfig::default()
+    };
+
+    let listen = args
+        .listen
+        .or(config_file.listen)
+        .unwrap_or_else(|| "127.0.0.1:8080".to_string());
+
+    let backends = args
+        .backends
+        .or(config_file.backends)
+        .unwrap_or_else(|| {
+            vec![
+                "127.0.0.1:8081".to_string(),
+                "127.0.0.1:8082".to_string(),
+                "127.0.0.1:8083".to_string(),
+            ]
+        });
+
+    let algorithm = args
+        .algorithm
+        .or(config_file.algorithm)
+        .unwrap_or(Algorithm::LeastConnections);
+
+    let health_interval = args.health_interval.or(config_file.health_interval).unwrap_or(5);
+    let health_timeout = args.health_timeout.or(config_file.health_timeout).unwrap_or(1);
+
+    let lb = Arc::new(LoadBalancer::new(backends.clone(), algorithm));
 
     let lb_clone = Arc::clone(&lb);
-    let health_interval = args.health_interval;
-    let health_timeout = args.health_timeout;
     tokio::spawn(async move {
         run_health_checks(
             Arc::clone(&lb_clone.backends),
@@ -51,11 +86,11 @@ async fn main() -> io::Result<()> {
         .await;
     });
 
-    let listener = TcpListener::bind(&args.listen).await?;
-    println!("Load balancer started on {}", args.listen);
+    let listener = TcpListener::bind(&listen).await?;
+    println!("Load balancer started on {}", listen);
     println!(
         "Algorithm: {:?} | Active health checks: Enabled",
-        args.algorithm.as_str()
+        algorithm.as_str()
     );
 
     loop {
