@@ -3,7 +3,10 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
+use serde::Deserialize;
+
 /// Represents a single backend server and its current state.
+#[derive(Debug, Deserialize)]
 pub struct Backend {
     pub address: String,
     pub is_healthy: AtomicBool,

@@ -1,7 +1,8 @@
 use clap::ValueEnum;
+use serde::Deserialize;
 
 /// Defines the available load balancing strategies.
-#[derive(Clone, Copy, Debug, ValueEnum)]
+#[derive(Clone, Copy, Debug, ValueEnum, Deserialize)]
 pub enum Algorithm {
     RoundRobin,
     LeastConnections,
