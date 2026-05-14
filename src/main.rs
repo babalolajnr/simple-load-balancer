@@ -89,7 +89,7 @@ async fn main() -> io::Result<()> {
     let listener = TcpListener::bind(&listen).await?;
     println!("Load balancer started on {}", listen);
     println!(
-        "Algorithm: {:?} | Active health checks: Enabled",
+        "Algorithm: {} | Active health checks: Enabled",
         algorithm.as_str()
     );
 
