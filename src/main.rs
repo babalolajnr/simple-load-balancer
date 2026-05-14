@@ -43,7 +43,7 @@ async fn main() -> io::Result<()> {
 
     let config_file = if let Some(path) = &args.config {
         TomlConfig::new(path).unwrap_or_else(|e| {
-            eprintln!("Failed to load config file: {}", e);
+            eprintln!("Failed to load config file '{}': {}", path, e);
             std::process::exit(1);
         })
     } else {
