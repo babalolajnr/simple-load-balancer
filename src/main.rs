@@ -64,11 +64,11 @@ async fn main() -> io::Result<()> {
 
         tokio::spawn(async move {
             if let Some(backend_index) = lb.select_backend() {
-                let backend_address = lb.backends[backend_index].address.clone();
+                let backend_address = &lb.backends[backend_index].address;
 
                 let _guard = ConnectionGuard::new(Arc::clone(&lb.backends), backend_index);
 
-                match TcpStream::connect(&backend_address).await {
+                match TcpStream::connect(backend_address).await {
                     Ok(mut server_stream) => {
                         println!(
                             "Routing {} -> {} (Active Conns: {})",
