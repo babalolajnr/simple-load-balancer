@@ -50,3 +50,69 @@ impl Drop for ConnectionGuard {
             .fetch_sub(1, Ordering::Relaxed);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::Ordering;
+
+    #[test]
+    fn test_connection_guard_creation_and_drop() {
+        let backends = Arc::new(vec![Backend::new("127.0.0.1:8080".to_string())]);
+
+        assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 0);
+
+        {
+            let _guard = ConnectionGuard::new(backends.clone(), 0);
+            assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 1);
+        }
+
+        assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn test_multiple_connection_guards_same_backend() {
+        let backends = Arc::new(vec![Backend::new("127.0.0.1:8080".to_string())]);
+
+        assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 0);
+
+        let guard1 = ConnectionGuard::new(backends.clone(), 0);
+        assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 1);
+
+        let guard2 = ConnectionGuard::new(backends.clone(), 0);
+        assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 2);
+
+        drop(guard1);
+        assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 1);
+
+        drop(guard2);
+        assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn test_connection_guards_different_backends() {
+        let backends = Arc::new(vec![
+            Backend::new("127.0.0.1:8080".to_string()),
+            Backend::new("127.0.0.1:8081".to_string()),
+        ]);
+
+        assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 0);
+        assert_eq!(backends[1].active_connections.load(Ordering::Relaxed), 0);
+
+        let guard1 = ConnectionGuard::new(backends.clone(), 0);
+        assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 1);
+        assert_eq!(backends[1].active_connections.load(Ordering::Relaxed), 0);
+
+        let guard2 = ConnectionGuard::new(backends.clone(), 1);
+        assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 1);
+        assert_eq!(backends[1].active_connections.load(Ordering::Relaxed), 1);
+
+        drop(guard1);
+        assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 0);
+        assert_eq!(backends[1].active_connections.load(Ordering::Relaxed), 1);
+
+        drop(guard2);
+        assert_eq!(backends[0].active_connections.load(Ordering::Relaxed), 0);
+        assert_eq!(backends[1].active_connections.load(Ordering::Relaxed), 0);
+    }
+}
