@@ -63,8 +63,50 @@ impl LoadBalancer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::algorithm::Algorithm;
     use std::collections::HashSet;
+    use std::sync::atomic::Ordering;
+
+    #[test]
+    fn test_new_load_balancer_initialization() {
+        let addresses = vec![
+            "127.0.0.1:8081".to_string(),
+            "127.0.0.1:8082".to_string(),
+        ];
+        let lb = LoadBalancer::new(addresses.clone(), Algorithm::RoundRobin);
+
+        assert_eq!(lb.backends.len(), 2);
+        assert_eq!(lb.backends[0].address, addresses[0]);
+        assert_eq!(lb.backends[1].address, addresses[1]);
+
+        for backend in lb.backends.iter() {
+            assert!(backend.is_healthy.load(Ordering::Relaxed));
+            assert_eq!(backend.active_connections.load(Ordering::Relaxed), 0);
+        }
+
+        assert_eq!(lb.current_index.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn test_new_load_balancer_empty_backends() {
+        let addresses: Vec<String> = vec![];
+        let lb = LoadBalancer::new(addresses, Algorithm::RoundRobin);
+
+        assert_eq!(lb.backends.len(), 0);
+        assert!(lb.select_backend().is_none());
+    }
+
+    #[test]
+    fn test_new_load_balancer_algorithm_round_robin_start() {
+        let addresses = vec![
+            "127.0.0.1:8081".to_string(),
+            "127.0.0.1:8082".to_string(),
+        ];
+        let lb = LoadBalancer::new(addresses, Algorithm::RoundRobin);
+
+        // Initially current_index is 0, so select_backend should return 0 (if healthy)
+        assert_eq!(lb.select_backend(), Some(0));
+        assert_eq!(lb.current_index.load(Ordering::Relaxed), 1);
+    }
 
     #[test]
     fn test_random_algorithm_is_actually_random() {
