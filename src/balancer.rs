@@ -40,23 +40,33 @@ impl LoadBalancer {
         }
 
         match self.algorithm {
-            Algorithm::RoundRobin => {
-                let count = self.current_index.fetch_add(1, Ordering::Relaxed);
-                let chosen_index = healthy_indices[count % healthy_indices.len()];
-                Some(chosen_index)
-            }
-            Algorithm::Random => {
-                let rng = rand::random_range(0..healthy_indices.len());
-                Some(healthy_indices[rng])
-            }
-            Algorithm::LeastConnections => {
-                let chosen_index = healthy_indices
-                    .into_iter()
-                    .min_by_key(|&i| self.backends[i].active_connections.load(Ordering::Relaxed))
-                    .unwrap();
-                Some(chosen_index)
-            }
+            Algorithm::RoundRobin => self.round_robin(&healthy_indices),
+            Algorithm::Random => self.random(&healthy_indices),
+            Algorithm::LeastConnections => self.least_connections(&healthy_indices),
         }
+    }
+
+    /// Selects a backend using the round-robin algorithm.
+    fn round_robin(&self, healthy_indices: &[usize]) -> Option<usize> {
+        let count = self.current_index.fetch_add(1, Ordering::Relaxed);
+        let chosen_index = healthy_indices[count % healthy_indices.len()];
+        Some(chosen_index)
+    }
+
+    /// Selects a backend using the random algorithm.
+    fn random(&self, healthy_indices: &[usize]) -> Option<usize> {
+        let rng = rand::random_range(0..healthy_indices.len());
+        Some(healthy_indices[rng])
+    }
+
+    /// Selects a backend using the least-connections algorithm.
+    fn least_connections(&self, healthy_indices: &[usize]) -> Option<usize> {
+        let chosen_index = healthy_indices
+            .iter()
+            .min_by_key(|&i| self.backends[*i].active_connections.load(Ordering::Relaxed))
+            .unwrap();
+
+        Some(*chosen_index)
     }
 }
 
@@ -68,10 +78,7 @@ mod tests {
 
     #[test]
     fn test_new_load_balancer_initialization() {
-        let addresses = vec![
-            "127.0.0.1:8081".to_string(),
-            "127.0.0.1:8082".to_string(),
-        ];
+        let addresses = vec!["127.0.0.1:8081".to_string(), "127.0.0.1:8082".to_string()];
         let lb = LoadBalancer::new(addresses.clone(), Algorithm::RoundRobin);
 
         assert_eq!(lb.backends.len(), 2);
@@ -97,10 +104,7 @@ mod tests {
 
     #[test]
     fn test_new_load_balancer_algorithm_round_robin_start() {
-        let addresses = vec![
-            "127.0.0.1:8081".to_string(),
-            "127.0.0.1:8082".to_string(),
-        ];
+        let addresses = vec!["127.0.0.1:8081".to_string(), "127.0.0.1:8082".to_string()];
         let lb = LoadBalancer::new(addresses, Algorithm::RoundRobin);
 
         // Initially current_index is 0, so select_backend should return 0 (if healthy)
@@ -126,6 +130,10 @@ mod tests {
             }
         }
 
-        assert!(selected_indices.len() > 1, "Random algorithm should select more than one backend, but got only {:?}", selected_indices);
+        assert!(
+            selected_indices.len() > 1,
+            "Random algorithm should select more than one backend, but got only {:?}",
+            selected_indices
+        );
     }
 }

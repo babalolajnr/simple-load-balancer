@@ -165,7 +165,7 @@ Backend 127.0.0.1:8082 is now unhealthy! Marking as UNHEALTHY.
 
 ## Future Enhancements
 
-- [ ] Configuration file support (TOML/YAML)
+- [x] Configuration file support (TOML/YAML)
 - [x] CLI arguments for dynamic configuration
 - [ ] Metrics and monitoring endpoints
 - [ ] Connection pooling

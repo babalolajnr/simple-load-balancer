@@ -1,7 +1,7 @@
 use clap::Parser;
 use load_balancer::{
     algorithm::Algorithm, backend::ConnectionGuard, balancer::LoadBalancer,
-    health::run_health_checks, config::toml::TomlConfig,
+    config::toml::TomlConfig, health::run_health_checks,
 };
 use std::sync::{Arc, atomic::Ordering};
 use tokio::{
@@ -55,24 +55,27 @@ async fn main() -> io::Result<()> {
         .or(config_file.listen)
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
 
-    let backends = args
-        .backends
-        .or(config_file.backends)
-        .unwrap_or_else(|| {
-            vec![
-                "127.0.0.1:8081".to_string(),
-                "127.0.0.1:8082".to_string(),
-                "127.0.0.1:8083".to_string(),
-            ]
-        });
+    let backends = args.backends.or(config_file.backends).unwrap_or_else(|| {
+        vec![
+            "127.0.0.1:8081".to_string(),
+            "127.0.0.1:8082".to_string(),
+            "127.0.0.1:8083".to_string(),
+        ]
+    });
 
     let algorithm = args
         .algorithm
         .or(config_file.algorithm)
         .unwrap_or(Algorithm::LeastConnections);
 
-    let health_interval = args.health_interval.or(config_file.health_interval).unwrap_or(5);
-    let health_timeout = args.health_timeout.or(config_file.health_timeout).unwrap_or(1);
+    let health_interval = args
+        .health_interval
+        .or(config_file.health_interval)
+        .unwrap_or(5);
+    let health_timeout = args
+        .health_timeout
+        .or(config_file.health_timeout)
+        .unwrap_or(1);
 
     let lb = Arc::new(LoadBalancer::new(backends.clone(), algorithm));
 
