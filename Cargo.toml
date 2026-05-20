@@ -6,7 +6,10 @@ edition = "2024"
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
 rand = "0.10.1"
+rustls = "0.23.10"
+rustls-pemfile = "2.1.2"
 serde = { version = "1.0.228", features = ["derive"] }
 # We use the 'full' feature flag to get access to TCP networking and the async runtime
 tokio = { version = "1", features = ["full"] }
+tokio-rustls = "0.26.0"
 toml = "1.1.2"

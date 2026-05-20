@@ -1,13 +1,20 @@
 use clap::Parser;
 use load_balancer::{
-    algorithm::Algorithm, backend::ConnectionGuard, balancer::LoadBalancer,
-    config::toml::TomlConfig, health::run_health_checks,
+    algorithm::Algorithm,
+    backend::ConnectionGuard,
+    balancer::LoadBalancer,
+    config::toml::TomlConfig,
+    health::run_health_checks,
+    tls::{load_certs, load_keys},
 };
+use rustls::ServerConfig;
+use std::path::Path;
 use std::sync::{Arc, atomic::Ordering};
 use tokio::{
     io,
     net::{TcpListener, TcpStream},
 };
+use tokio_rustls::TlsAcceptor;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -35,6 +42,14 @@ struct Args {
     /// Health check timeout in seconds
     #[arg(long)]
     health_timeout: Option<u64>,
+
+    /// Path to TLS certificate (PEM)
+    #[arg(long)]
+    tls_cert: Option<String>,
+
+    /// Path to TLS private key (PEM)
+    #[arg(long)]
+    tls_key: Option<String>,
 }
 
 #[tokio::main]
@@ -77,6 +92,30 @@ async fn main() -> io::Result<()> {
         .or(config_file.health_timeout)
         .unwrap_or(1);
 
+    let tls_cert = args.tls_cert.or(config_file.tls_cert);
+    let tls_key = args.tls_key.or(config_file.tls_key);
+
+    let tls_acceptor = if let (Some(cert_path), Some(key_path)) = (tls_cert, tls_key) {
+        let certs = load_certs(Path::new(&cert_path))?;
+        let mut keys = load_keys(Path::new(&key_path))?;
+
+        if keys.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "No valid private keys found",
+            ));
+        }
+
+        let config = ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(certs, keys.remove(0))
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+        Some(TlsAcceptor::from(Arc::new(config)))
+    } else {
+        None
+    };
+
     let lb = Arc::new(LoadBalancer::new(backends.clone(), algorithm));
 
     let lb_clone = Arc::clone(&lb);
@@ -97,10 +136,24 @@ async fn main() -> io::Result<()> {
     );
 
     loop {
-        let (mut client_stream, client_address) = listener.accept().await?;
+        let (client_stream, client_address) = listener.accept().await?;
         let lb = Arc::clone(&lb);
+        let tls_acceptor = tls_acceptor.clone();
 
         tokio::spawn(async move {
+            let mut client_stream: Box<dyn AsyncReadWrite + Unpin + Send> =
+                if let Some(acceptor) = tls_acceptor {
+                    match acceptor.accept(client_stream).await {
+                        Ok(tls_stream) => Box::new(tls_stream),
+                        Err(e) => {
+                            eprintln!("TLS handshake error from {}: {}", client_address, e);
+                            return;
+                        }
+                    }
+                } else {
+                    Box::new(client_stream)
+                };
+
             if let Some(backend_index) = lb.select_backend() {
                 let backend_address = &lb.backends[backend_index].address;
 
@@ -136,3 +189,6 @@ async fn main() -> io::Result<()> {
         });
     }
 }
+
+trait AsyncReadWrite: io::AsyncRead + io::AsyncWrite {}
+impl<T: io::AsyncRead + io::AsyncWrite> AsyncReadWrite for T {}

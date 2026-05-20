@@ -8,6 +8,8 @@ pub struct TomlConfig {
     pub algorithm: Option<Algorithm>,
     pub health_interval: Option<u64>,
     pub health_timeout: Option<u64>,
+    pub tls_cert: Option<String>,
+    pub tls_key: Option<String>,
 }
 
 impl TomlConfig {
